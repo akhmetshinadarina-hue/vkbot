@@ -1,6 +1,6 @@
 import time
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 import vk_api
 from vk_api.exceptions import ApiError
@@ -10,6 +10,15 @@ load_dotenv()
 TOKEN = os.getenv('VK_TOKEN')
 TARGET_USER_ID = os.getenv('TARGET_USER_ID')
 YOUR_USER_IDS_RAW = os.getenv('YOUR_USER_IDS')
+
+# Московский часовой пояс (UTC+3)
+MSK = timezone(timedelta(hours=3))
+
+
+def now_msk():
+    """Текущее время в московском часовом поясе."""
+    return datetime.now(MSK)
+
 
 # Проверка обязательных переменных
 if not TOKEN or not TARGET_USER_ID or not YOUR_USER_IDS_RAW:
@@ -40,7 +49,7 @@ last_online_status = None
 
 
 def log(message):
-    now = datetime.now().strftime('%H:%M:%S')
+    now = now_msk().strftime('%H:%M:%S')
     print(f"[{now}] {message}")
 
 
@@ -57,7 +66,9 @@ def check_online(user_id):
             platform = last_seen.get('platform', '?')
             last_seen_time = last_seen.get('time', 0)
             if last_seen_time:
-                last_seen_str = datetime.fromtimestamp(last_seen_time).strftime('%d.%m %H:%M')
+                # Переводим время из UTC в московское
+                dt = datetime.fromtimestamp(last_seen_time, MSK)
+                last_seen_str = dt.strftime('%d.%m %H:%M')
             else:
                 last_seen_str = 'скрыто'
             return is_online, platform, last_seen_str
@@ -132,7 +143,9 @@ def main():
                 if is_online:
                     send_notification('Выложен новый пост "Цитаты.Мемы.Сохраненки"')
                 else:
-                    send_notification("Пост удален")
+                    # Время выхода в московском поясе
+                    exit_time = now_msk().strftime('%H:%M')
+                    send_notification(f"Пост удален ({exit_time})")
                 last_online_status = is_online
 
         time.sleep(CHECK_INTERVAL)
@@ -143,3 +156,4 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         log("Бот остановлен пользователем.")
+        main()
